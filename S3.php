@@ -83,7 +83,7 @@ class S3
 
 
 	/**
-	* Set the sertvice endpoint
+	* Set the service endpoint
 	*
 	* @param string $host Hostname
 	* @return void
@@ -299,6 +299,12 @@ class S3
 		if (isset($response->body, $response->body->Contents))
 		foreach ($response->body->Contents as $c)
 		{
+			// Since it's a prefix, we don't want to match files with only that name and no suffixing string
+			if ($prefix !== null && $prefix !== '' && (string)$c->Key === $prefix)
+			{
+				continue;
+			}
+
 			$results[(string)$c->Key] = array(
 				'name' => (string)$c->Key,
 				'time' => strtotime((string)$c->LastModified),
@@ -349,6 +355,11 @@ class S3
 				$nextMarker = (string)$response->body->NextMarker;
 
 		} while ($response !== false && (string)$response->body->IsTruncated == 'true');
+
+		if ($prefix !== null && $prefix !== '' && isset($results[$prefix]))
+		{
+			unset($results[$prefix]);
+		}
 
 		return $results;
 	}
@@ -638,10 +649,10 @@ class S3
 	* @param string $uri Source object URI
 	* @param string $bucket Destination bucket name
 	* @param string $uri Destination object URI
-	* @param constant $acl ACL constant
+	* @param string $acl ACL constant
 	* @param array $metaHeaders Optional array of x-amz-meta-* headers
 	* @param array $requestHeaders Optional array of request headers (content type, disposition, etc.)
-	* @param constant $storageClass Storage class constant
+	* @param string $storageClass Storage class constant
 	* @return mixed | false
 	*/
 	public static function copyObject($srcBucket, $srcUri, $bucket, $uri, $acl = self::ACL_PRIVATE, $metaHeaders = array(), $requestHeaders = array(), $storageClass = self::STORAGE_CLASS_STANDARD)
@@ -672,6 +683,32 @@ class S3
 		) : false;
 	}
 
+	/**
+	* Move (copy+delete) an object
+	*
+	* @param string $bucket Source bucket name
+	* @param string $uri Source object URI
+	* @param string $bucket Destination bucket name
+	* @param string $uri Destination object URI
+	* @param string $acl ACL constant
+	* @param array $metaHeaders Optional array of x-amz-meta-* headers
+	* @param array $requestHeaders Optional array of request headers (content type, disposition, etc.)
+	* @param string $storageClass Storage class constant
+	* @return mixed | false
+	*/
+	public static function moveObject($srcBucket, $srcUri, $targetBucket, $targetUri, $acl = self::ACL_PRIVATE, $metaHeaders = array(), $requestHeaders = array(), $storageClass = self::STORAGE_CLASS_STANDARD)
+	{
+		try
+		{
+			self::copyObject($srcBucket, $srcUri, $targetBucket, $targetUri, $acl, $metaHeaders, $requestHeaders, $storageClass);
+			self::deleteObject($srcBucket, $srcUri);
+			return true;
+		}
+		catch (Exception $e)
+		{
+			return false;
+		}
+	}
 
 	/**
 	* Set logging for a bucket
@@ -1416,7 +1453,7 @@ class S3
 	*		[I12HK7MPO1UQDA] => Completed
 	*		[I1IA7R6JKTC3L2] => Completed
 	*	)
-    *
+	*
 	* @param string $distributionId Distribution ID from listDistributions()
 	* @return array
 	*/
@@ -1861,7 +1898,7 @@ final class S3Request
 					$this->resource
 				);
 			}
-        }
+		}
 
 		curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
 		curl_setopt($curl, CURLOPT_HEADER, false);
