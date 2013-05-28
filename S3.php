@@ -64,21 +64,26 @@ class S3
 	private static $__signingKeyPairId = null; // AWS Key Pair ID
 	private static $__signingKeyResource = false; // Key resource, freeSigningKey() must be called to clear it from memory
 
-
 	/**
 	* Constructor - if you're not using the class statically
 	*
-	* @param string $accessKey Access key
-	* @param string $secretKey Secret key
-	* @param boolean $useSSL Enable SSL
-	* @return void
+	* @param array $options Options array, can include accessKey, secretKey, useSSL and endpoint array keys
 	*/
-	public function __construct($accessKey = null, $secretKey = null, $useSSL = false, $endpoint = 's3.amazonaws.com')
+	public function __construct(array $options = array())
 	{
-		if ($accessKey !== null && $secretKey !== null)
-			self::setAuth($accessKey, $secretKey);
-		self::$useSSL = $useSSL;
-		self::$endpoint = $endpoint;
+		$defaultOptions = array(
+			'accessKey' => null,
+			'secretKey' => null,
+			'useSSL' => false,
+			'endpoint' => 's3.amazonaws.com'
+		);
+
+		$options = array_merge($defaultOptions, $options);
+
+		if ($options['accessKey'] !== null && $options['secretKey'] !== null)
+			self::setAuth($options['accessKey'], $options['secretKey']);
+		self::$useSSL = $options['useSSL'];
+		self::$endpoint = $options['endpoint'];
 	}
 
 
@@ -92,6 +97,7 @@ class S3
 	{
 		self::$endpoint = $host;
 	}
+
 
 	/**
 	* Set AWS access key and secret key
@@ -151,14 +157,14 @@ class S3
 	* Set proxy information
 	*
 	* @param string $host Proxy hostname and port (localhost:1234)
-	* @param string $user Proxy username
-	* @param string $pass Proxy password
-	* @param constant $type CURL proxy type
+	* @param string|null $user Proxy username
+	* @param string|null $pass Proxy password
+	* @param int $type CURL proxy type
 	* @return void
 	*/
 	public static function setProxy($host, $user = null, $pass = null, $type = CURLPROXY_SOCKS5)
 	{
-		self::$proxy = array('host' => $host, 'type' => $type, 'user' => null, 'pass' => 'null');
+		self::$proxy = array('host' => $host, 'type' => $type, 'user' => $user, 'pass' => $pass);
 	}
 
 
