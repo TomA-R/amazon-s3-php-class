@@ -218,14 +218,18 @@ class S3
 	* @param string $file Filename
 	* @param integer $line Line number
 	* @param integer $code Error code
+	* @throws S3Exception
 	* @return void
 	*/
 	private static function __triggerError($message, $file, $line, $code = 0)
 	{
-		if (self::$useExceptions)
+		if (self::$useExceptions) {
 			throw new S3Exception($message, $file, $line, $code);
+		}
 		else
+		{
 			trigger_error($message, E_USER_WARNING);
+		}
 	}
 
 
@@ -375,8 +379,8 @@ class S3
 	* Put a bucket
 	*
 	* @param string $bucket Bucket name
-	* @param constant $acl ACL flag
-	* @param string $location Set as "EU" to create buckets hosted in Europe
+	* @param string $acl ACL flag
+	* @param string|bool $location Set as "EU" to create buckets hosted in Europe
 	* @return boolean
 	*/
 	public static function putBucket($bucket, $acl = self::ACL_PRIVATE, $location = false)
@@ -472,16 +476,14 @@ class S3
 
 
 	/**
-	* Put an object
-	*
 	* @param mixed $input Input data
 	* @param string $bucket Bucket name
 	* @param string $uri Object URI
-	* @param constant $acl ACL constant
+	* @param string $acl ACL constant
 	* @param array $metaHeaders Array of x-amz-meta-* headers
 	* @param array $requestHeaders Array of request headers or content type as a string
-	* @param constant $storageClass Storage class constant
-	* @return boolean
+	* @param string $storageClass Storage class constant
+	* @return bool
 	*/
 	public static function putObject($input, $bucket, $uri, $acl = self::ACL_PRIVATE, $metaHeaders = array(), $requestHeaders = array(), $storageClass = self::STORAGE_CLASS_STANDARD)
 	{
@@ -561,7 +563,7 @@ class S3
 	* @param string $file Input file path
 	* @param string $bucket Bucket name
 	* @param string $uri Object URI
-	* @param constant $acl ACL constant
+	* @param string $acl ACL constant
 	* @param array $metaHeaders Array of x-amz-meta-* headers
 	* @param string $contentType Content type
 	* @return boolean
@@ -578,7 +580,7 @@ class S3
 	* @param string $string Input data
 	* @param string $bucket Bucket name
 	* @param string $uri Object URI
-	* @param constant $acl ACL constant
+	* @param string $acl ACL constant
 	* @param array $metaHeaders Array of x-amz-meta-* headers
 	* @param string $contentType Content type
 	* @return boolean
@@ -651,8 +653,8 @@ class S3
 	/**
 	* Copy an object
 	*
-	* @param string $bucket Source bucket name
-	* @param string $uri Source object URI
+	* @param string $srcBucket Source bucket name
+	* @param string $srcUri Source object URI
 	* @param string $bucket Destination bucket name
 	* @param string $uri Destination object URI
 	* @param string $acl ACL constant
@@ -692,10 +694,10 @@ class S3
 	/**
 	* Move (copy+delete) an object
 	*
-	* @param string $bucket Source bucket name
-	* @param string $uri Source object URI
-	* @param string $bucket Destination bucket name
-	* @param string $uri Destination object URI
+	* @param string $srcBucket Source bucket name
+	* @param string $srcUri Source object URI
+	* @param string $targetBucket Destination bucket name
+	* @param string $targetUri Destination object URI
 	* @param string $acl ACL constant
 	* @param array $metaHeaders Optional array of x-amz-meta-* headers
 	* @param array $requestHeaders Optional array of request headers (content type, disposition, etc.)
@@ -747,7 +749,7 @@ class S3
 			if (!$aclReadSet || !$aclWriteSet) self::setAccessControlPolicy($targetBucket, '', $acp);
 		}
 
-		$dom = new DOMDocument;
+		$dom = new DOMDocument();
 		$bucketLoggingStatus = $dom->createElement('BucketLoggingStatus');
 		$bucketLoggingStatus->setAttribute('xmlns', 'http://s3.amazonaws.com/doc/2006-03-01/');
 		if ($targetBucket !== null)
@@ -1041,7 +1043,7 @@ class S3
 	/**
 	* Get a CloudFront canned policy URL
 	*
-	* @param string $string URL to sign
+	* @param string $url URL to sign
 	* @param integer $lifetime URL lifetime
 	* @return string
 	*/
@@ -1062,7 +1064,7 @@ class S3
 	*
 	* @param string $bucket Bucket name
 	* @param string $uriPrefix Object URI prefix
-	* @param constant $acl ACL constant
+	* @param string $acl ACL constant
 	* @param integer $lifetime Lifetime in seconds
 	* @param integer $maxFileSize Maximum filesize in bytes (default 5MB)
 	* @param string $successRedirect Redirect URL or 200 / 201 status code
@@ -1335,12 +1337,6 @@ class S3
 		elseif ($rest->body instanceof SimpleXMLElement && isset($rest->body->DistributionSummary))
 		{
 			$list = array();
-			if (isset($rest->body->Marker, $rest->body->MaxItems, $rest->body->IsTruncated))
-			{
-				//$info['marker'] = (string)$rest->body->Marker;
-				//$info['maxItems'] = (int)$rest->body->MaxItems;
-				//$info['isTruncated'] = (string)$rest->body->IsTruncated == 'true' ? true : false;
-			}
 			foreach ($rest->body->DistributionSummary as $summary)
 				$list[(string)$summary->Id] = self::__parseCloudFrontDistributionConfig($summary);
 
@@ -1735,6 +1731,7 @@ final class S3Request
 	* @param string $verb Verb
 	* @param string $bucket Bucket name
 	* @param string $uri Object URI
+	* @param string $endpoint Host
 	* @return mixed
 	*/
 	function __construct($verb, $bucket = '', $uri = '', $endpoint = 's3.amazonaws.com')
@@ -1743,11 +1740,6 @@ final class S3Request
 		$this->verb = $verb;
 		$this->bucket = $bucket;
 		$this->uri = $uri !== '' ? '/'.str_replace('%2F', '/', rawurlencode($uri)) : '/';
-
-		//if ($this->bucket !== '')
-		//	$this->resource = '/'.$this->bucket.$this->uri;
-		//else
-		//	$this->resource = $this->uri;
 
 		if ($this->bucket !== '')
 		{
@@ -1830,7 +1822,7 @@ final class S3Request
 			$query = substr($this->uri, -1) !== '?' ? '?' : '&';
 			foreach ($this->parameters as $var => $value)
 				if ($value == null || $value == '') $query .= $var.'&';
-				else $query .= $var.'='.rawurlencode($value).'&';
+				else $query .= $var . '=' . rawurlencode($value).'&';
 			$query = substr($query, 0, -1);
 			$this->uri .= $query;
 
@@ -1873,20 +1865,20 @@ final class S3Request
 		// Headers
 		$headers = array(); $amz = array();
 		foreach ($this->amzHeaders as $header => $value)
-			if (strlen($value) > 0) $headers[] = $header.': '.$value;
+			if (strlen($value) > 0) $headers[] = $header . ': ' . $value;
 		foreach ($this->headers as $header => $value)
-			if (strlen($value) > 0) $headers[] = $header.': '.$value;
+			if (strlen($value) > 0) $headers[] = $header . ': ' . $value;
 
 		// Collect AMZ headers for signature
 		foreach ($this->amzHeaders as $header => $value)
-			if (strlen($value) > 0) $amz[] = strtolower($header).':'.$value;
+			if (strlen($value) > 0) $amz[] = strtolower($header) . ':' . $value;
 
 		// AMZ headers must be sorted
 		if (sizeof($amz) > 0)
 		{
 			//sort($amz);
 			usort($amz, array(&$this, '__sortMetaHeadersCmp'));
-			$amz = "\n".implode("\n", $amz);
+			$amz = "\n" . implode("\n", $amz);
 		} else $amz = '';
 
 		if (S3::hasAuth())
@@ -1897,10 +1889,10 @@ final class S3Request
 			else
 			{
 				$headers[] = 'Authorization: ' . S3::__getSignature(
-					$this->verb."\n".
-					$this->headers['Content-MD5']."\n".
-					$this->headers['Content-Type']."\n".
-					$this->headers['Date'].$amz."\n".
+					$this->verb . "\n".
+					$this->headers['Content-MD5'] . "\n".
+					$this->headers['Content-Type'] . "\n".
+					$this->headers['Date'] . $amz . "\n".
 					$this->resource
 				);
 			}
@@ -1976,7 +1968,9 @@ final class S3Request
 		}
 
 		// Clean up file resources
-		if ($this->fp !== false && is_resource($this->fp)) fclose($this->fp);
+		if ($this->fp !== false && is_resource($this->fp)) {
+			fclose($this->fp);
+		}
 
 		return $this->response;
 	}
@@ -2003,7 +1997,8 @@ final class S3Request
 	/**
 	* CURL write callback
 	*
-	* @param resource &$curl CURL resource
+	* @deprecated
+	* @param resource &$curl CURL resource @deprecated
 	* @param string &$data Data
 	* @return integer
 	*/
@@ -2037,7 +2032,8 @@ final class S3Request
 	/**
 	* CURL header callback
 	*
-	* @param resource &$curl CURL resource
+	* @deprecated
+	* @param resource &$curl CURL resource @deprecated
 	* @param string &$data Data
 	* @return integer
 	*/
